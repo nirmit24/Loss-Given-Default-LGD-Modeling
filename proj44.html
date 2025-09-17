@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loss Given Default (LGD) Model Dashboard</title>
+    <style>
+        /* --- General Styling --- */
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap');
+
+        :root {
+            --bg-color: #1a1a2e;
+            --card-color: #16213e;
+            --primary-accent: #0f3460;
+            --secondary-accent: #5372f0;
+            --text-color: #e3e3e3;
+            --text-muted: #a0a0a0;
+            --border-color: #2c3e50;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1, h2, h3 {
+            color: var(--text-color);
+            font-weight: 400;
+        }
+
+        h1 {
+            font-weight: 700;
+            color: #ffffff;
+            border-bottom: 2px solid var(--secondary-accent);
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        
+        /* --- Layout --- */
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            width: 100%;
+            max-width: 1400px;
+        }
+
+        .card {
+            background-color: var(--card-color);
+            padding: 25px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+        
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        
+        /* --- Interactive Calculator --- */
+        #predictor-card {
+            grid-column: 1 / -1;
+        }
+
+        .controls-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            align-items: center;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9em;
+            color: var(--text-muted);
+        }
+
+        .control-group span {
+            font-weight: 700;
+            color: var(--secondary-accent);
+        }
+
+        input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+
+        .result-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--primary-accent);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .result-display h3 {
+            margin: 0 0 10px 0;
+            color: var(--text-muted);
+            font-size: 1.2em;
+        }
+
+        #predicted-lgd {
+            font-size: 3.5em;
+            font-weight: 700;
+            color: #ffffff;
+            line-height: 1;
+        }
+        
+        /* --- Model Info & Charts --- */
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .info-table th, .info-table td {
+            text-align: left;
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .info-table th {
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+        
+        /* --- Responsive Design --- */
+        @media (max-width: 900px) {
+            .dashboard-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <h1>Loss Given Default (LGD) Interactive Dashboard</h1>
+
+    <div class="dashboard-container">
+        
+        <div class="card" id="predictor-card">
+            <h2>Interactive LGD Predictor</h2>
+            <div class="controls-grid">
+                
+                <div class="control-group">
+                    <label for="int_rate">Interest Rate (%): <span id="int_rate_value">15.0</span></label>
+                    <input type="range" id="int_rate" min="5" max="25" value="15" step="0.1">
+                </div>
+
+                <div class="control-group">
+                    <label for="dti">Debt-to-Income Ratio (DTI): <span id="dti_value">20.0</span></label>
+                    <input type="range" id="dti" min="5" max="40" value="20" step="0.1">
+                </div>
+
+                <div class="control-group">
+                    <label for="revol_util">Revolving Utilization (%): <span id="revol_util_value">70.0</span></label>
+                    <input type="range" id="revol_util" min="10" max="100" value="70" step="0.1">
+                </div>
+
+                <div class="result-display">
+                    <h3>Predicted LGD</h3>
+                    <div id="predicted-lgd">...</div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Model Information</h3>
+            <p style="color: var(--text-muted); font-size: 0.9em;">
+                This dashboard uses a simplified GLM (Tweedie with Log Link) to predict LGD based on loan characteristics. The coefficients below are for demonstration.
+            </p>
+            <table class="info-table">
+                <thead>
+                    <tr>
+                        <th>Parameter</th>
+                        <th>Coefficient (B)</th>
+                        <th>Interpretation</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>(Intercept)</td>
+                        <td id="b_intercept"></td>
+                        <td>Baseline log(LGD)</td>
+                    </tr>
+                    <tr>
+                        <td>Interest Rate</td>
+                        <td id="b_int_rate"></td>
+                        <td>Higher rate increases LGD</td>
+                    </tr>
+                    <tr>
+                        <td>DTI</td>
+                        <td id="b_dti"></td>
+                        <td>Higher DTI increases LGD</td>
+                    </tr>
+                    <tr>
+                         <td>Revolving Util</td>
+                        <td id="b_revol_util"></td>
+                        <td>Higher utilization increases LGD</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h3>LGD Distribution (Sample Data)</h3>
+            <canvas id="lgdDistributionChart"></canvas>
+        </div>
+
+        <div class="card">
+            <h3>LGD vs. Interest Rate</h3>
+            <canvas id="lgdVsIntRateChart"></canvas>
+        </div>
+        
+        <div class="card">
+            <h3>LGD vs. Debt-to-Income Ratio</h3>
+            <canvas id="lgdVsDtiChart"></canvas>
+        </div>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            
+            // --- 1. SAMPLE DATA & MODEL COEFFICIENTS ---
+            
+            // Sample data from our SPSS exercise
+            const sampleData = [
+                { loan_id: 1001, LGD: 0.540, int_rate: 14.5, dti: 22.5, revol_util: 68.4 },
+                { loan_id: 1002, LGD: 0.570, int_rate: 18.2, dti: 18.9, revol_util: 81.2 },
+                { loan_id: 1003, LGD: 0.738, int_rate: 11.1, dti: 15.1, revol_util: 55.1 },
+                { loan_id: 1004, LGD: 0.525, int_rate: 12.8, dti: 11.3, revol_util: 45.0 },
+                { loan_id: 1005, LGD: 0.700, int_rate: 21.5, dti: 25.8, revol_util: 92.3 },
+                { loan_id: 1006, LGD: 0.600, int_rate: 7.9, dti: 8.2, revol_util: 31.5 },
+                { loan_id: 1007, LGD: 0.550, int_rate: 16.0, dti: 20.4, revol_util: 75.6 },
+                { loan_id: 1008, LGD: 0.550, int_rate: 13.5, dti: 17.6, revol_util: 65.2 },
+                { loan_id: 1009, LGD: 0.600, int_rate: 9.9, dti: 12.0, revol_util: 40.8 },
+                { loan_id: 1010, LGD: 0.650, int_rate: 19.9, dti: 23.1, revol_util: 88.1 },
+                { loan_id: 1011, LGD: 0.600, int_rate: 12.1, dti: 19.5, revol_util: 71.3 },
+                { loan_id: 1012, LGD: 0.600, int_rate: 8.9, dti: 9.8, revol_util: 35.7 },
+                { loan_id: 1013, LGD: 0.700, int_rate: 17.5, dti: 21.0, revol_util: 79.9 },
+                { loan_id: 1014, LGD: 0.550, int_rate: 14.0, dti: 16.7, revol_util: 60.1 },
+                { loan_id: 1015, LGD: 0.600, int_rate: 22.1, dti: 24.5, revol_util: 95.2 },
+                { loan_id: 1016, LGD: 0.700, int_rate: 10.5, dti: 14.3, revol_util: 58.6 },
+                { loan_id: 1017, LGD: 0.550, int_rate: 15.2, dti: 19.8, revol_util: 72.4 },
+                { loan_id: 1018, LGD: 0.600, int_rate: 11.8, dti: 18.1, revol_util: 66.8 },
+                { loan_id: 1019, LGD: 0.700, int_rate: 16.8, dti: 22.3, revol_util: 82.0 },
+                { loan_id: 1020, LGD: 0.600, int_rate: 9.2, dti: 10.5, revol_util: 38.2 }
+            ];
+
+            // Plausible coefficients for our simplified Tweedie GLM with Log Link.
+            // These are for demonstration purposes.
+            const modelCoefficients = {
+                intercept: -1.5,
+                int_rate: 0.03,
+                dti: 0.015,
+                revol_util: 0.005
+            };
+            
+            // --- 2. INTERACTIVE CALCULATOR LOGIC ---
+
+            const intRateSlider = document.getElementById('int_rate');
+            const dtiSlider = document.getElementById('dti');
+            const revolUtilSlider = document.getElementById('revol_util');
+
+            const intRateValue = document.getElementById('int_rate_value');
+            const dtiValue = document.getElementById('dti_value');
+            const revolUtilValue = document.getElementById('revol_util_value');
+
+            const predictedLgdOutput = document.getElementById('predicted-lgd');
+            
+            function calculateAndDisplayLGD() {
+                // Get current values from sliders
+                const intRate = parseFloat(intRateSlider.value);
+                const dti = parseFloat(dtiSlider.value);
+                const revolUtil = parseFloat(revolUtilSlider.value);
+
+                // Update the text display next to sliders
+                intRateValue.textContent = intRate.toFixed(1);
+                dtiValue.textContent = dti.toFixed(1);
+                revolUtilValue.textContent = revolUtil.toFixed(1);
+                
+                // Calculate the linear predictor (log of LGD)
+                const logLGD = modelCoefficients.intercept +
+                               (modelCoefficients.int_rate * intRate) +
+                               (modelCoefficients.dti * dti) +
+                               (modelCoefficients.revol_util * revolUtil);
+                
+                // Since it's a log link, we exponentiate to get the predicted LGD
+                let predictedLGD = Math.exp(logLGD);
+                
+                // Cap the prediction at a realistic maximum (e.g., 99.9%)
+                predictedLGD = Math.min(predictedLGD, 0.999);
+                
+                // Display the result formatted as a percentage
+                predictedLgdOutput.textContent = (predictedLGD * 100).toFixed(1) + '%';
+            }
+
+            // Add event listeners to all sliders
+            [intRateSlider, dtiSlider, revolUtilSlider].forEach(slider => {
+                slider.addEventListener('input', calculateAndDisplayLGD);
+            });
+            
+            // --- 3. POPULATE MODEL INFO & INITIAL CALCULATION ---
+
+            document.getElementById('b_intercept').textContent = modelCoefficients.intercept;
+            document.getElementById('b_int_rate').textContent = modelCoefficients.int_rate;
+            document.getElementById('b_dti').textContent = modelCoefficients.dti;
+            document.getElementById('b_revol_util').textContent = modelCoefficients.revol_util;
+            
+            // Initial calculation on page load
+            calculateAndDisplayLGD();
+
+            // --- 4. CHART CREATION ---
+            
+            const chartBackgroundColor = 'rgba(83, 114, 240, 0.2)';
+            const chartBorderColor = 'rgba(83, 114, 240, 1)';
+
+            // Chart 1: LGD Distribution (as a Bar Chart/Histogram)
+            const lgdValues = sampleData.map(d => d.LGD);
+            const bins = [0.5, 0.55, 0.6, 0.65, 0.7, 0.75];
+            const binCounts = Array(bins.length -1).fill(0);
+            lgdValues.forEach(val => {
+                for (let i = 0; i < bins.length - 1; i++) {
+                    if (val >= bins[i] && val < bins[i+1]) {
+                        binCounts[i]++;
+                        break;
+                    }
+                }
+            });
+            new Chart(document.getElementById('lgdDistributionChart'), {
+                type: 'bar',
+                data: {
+                    labels: bins.slice(0, -1).map((b, i) => `${b.toFixed(2)}-${bins[i+1].toFixed(2)}`),
+                    datasets: [{
+                        label: 'Frequency of LGD',
+                        data: binCounts,
+                        backgroundColor: chartBackgroundColor,
+                        borderColor: chartBorderColor,
+                        borderWidth: 1
+                    }]
+                },
+                options: { scales: { y: { beginAtZero: true } } }
+            });
+
+            // Chart 2: LGD vs. Interest Rate (Scatter Plot)
+            new Chart(document.getElementById('lgdVsIntRateChart'), {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'LGD vs. Interest Rate',
+                        data: sampleData.map(d => ({ x: d.int_rate, y: d.LGD })),
+                        backgroundColor: chartBorderColor
+                    }]
+                },
+                options: {
+                    scales: {
+                        x: { title: { display: true, text: 'Interest Rate (%)' } },
+                        y: { title: { display: true, text: 'LGD' } }
+                    }
+                }
+            });
+
+            // Chart 3: LGD vs. DTI (Scatter Plot)
+            new Chart(document.getElementById('lgdVsDtiChart'), {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'LGD vs. DTI',
+                        data: sampleData.map(d => ({ x: d.dti, y: d.LGD })),
+                        backgroundColor: chartBorderColor
+                    }]
+                },
+                options: {
+                    scales: {
+                        x: { title: { display: true, text: 'Debt-to-Income Ratio' } },
+                        y: { title: { display: true, text: 'LGD' } }
+                    }
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>
